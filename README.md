@@ -1,5 +1,8 @@
 # Affinity Math Curve Generator
 
+> **⚠️ Important Note from the Developer:**
+> **Building from source is highly recommended.** Due to cross-compilation hardware limitations, pre-built binary releases are primarily provided for Apple Silicon Macs. Windows and Linux versions are not included in the releases and must be compiled locally from source. Additionally, pre-built updates for Intel Macs will likely be deprecated in the future.
+
 ## About the Project
 This is a standalone Python application designed to generate mathematically perfect curves (like Sine, Cosine, Parabolas, etc.) for vector design workflows. 
 
@@ -20,18 +23,17 @@ Because Affinity Designer currently lacks built-in tools for generating specific
 
 There are two ways to get the app running on your machine:
 
-### Option 1: Download the Pre-built App (Recommended)
-The easiest way to use the generator is to download the ready-to-use application.
+### Option 1: Download the Pre-built App (Mac Apple Silicon)
 1. Go to the [Releases](../../releases) page on this GitHub repository.
-2. Download the `.zip` file for your operating system (e.g., Mac Apple Silicon, Mac Intel, or Windows).
+2. Download the `.zip` file for your operating system (if available).
 3. Extract the file and double-click the application icon to run it. No terminal required!
 
-### Option 2: Build from Source
-If you want to modify the code, add your own features, or compile the app yourself, you can build it directly using Python (v3.13+ recommended).
+### Option 2: Build from Source (Highly Recommended)
+If you want to run this on Windows, Linux, or Intel Macs, or if you want to modify the code yourself, you should build it directly using Python (v3.13+ recommended).
 
 **1. Clone the repository and navigate to the folder:**
 ```bash
-git clone https://github.com/ROYALKINGSJ/Affinity_Math_Curves.git
+git clone [https://github.com/ROYALKINGSJ/Affinity_Math_Curves.git](https://github.com/ROYALKINGSJ/Affinity_Math_Curves.git)
 cd Affinity_Math_Curves
 ```
 
@@ -39,19 +41,25 @@ cd Affinity_Math_Curves
 ```bash
 pip install customtkinter Pillow pyinstaller
 ```
+*(Note for Mac/Linux users: You may need to use `pip3` instead of `pip` depending on your environment).*
 
 **3. Compile the standalone application:**
-Run PyInstaller to package the script into a native OS application. Make sure to replace `"PATH"` with the actual absolute path to your script:
-```bash
-pyinstaller --noconfirm --onedir --windowed --noconsole "PATH/curve_generator.py"
-```
+Run PyInstaller to package the script into a native OS application. Make sure to replace the path with the actual absolute path to your downloaded script.
 
-*(Example for Mac):*
-```bash
-pyinstaller --noconfirm --onedir --windowed --noconsole /Users/macbook/Desktop/Affinity_Math_Curves/curve_generator.py
-```
+* **For Mac:**
+  ```bash
+  pyinstaller --noconfirm --onedir --windowed --noconsole "/Users/your_username/Desktop/Affinity_Math_Curves/curve_generator.py"
+  ```
+* **For Windows:**
+  ```cmd
+  pyinstaller --noconfirm --onedir --windowed --noconsole "C:\Users\YourUsername\Desktop\Affinity_Math_Curves\curve_generator.py"
+  ```
+* **For Linux:**
+  ```bash
+  pyinstaller --noconfirm --onedir --windowed --noconsole "/home/your_username/Desktop/Affinity_Math_Curves/curve_generator.py"
+  ```
 
-Once finished, your runnable application will be located inside the newly generated `dist` folder.
+Once the process finishes, your runnable application will be located inside the newly generated `dist` folder.
 
 ---
 
@@ -61,3 +69,9 @@ Once finished, your runnable application will be located inside the newly genera
 3. Type your desired output file name.
 4. Click **Export Curve Data** and choose your preferred format (SVG, EPS, PNG, JPEG, or CSV).
 5. Drag and drop the exported file straight into your design software!
+
+---
+
+## Support the Project
+If this tool helped speed up your design workflow, consider supporting its continued development!
+☕ **[Support me on Patreon](https://patreon.com/TECHCOM?utm_medium=unknown&utm_source=join_link&utm_campaign=creatorshare_creator&utm_content=copyLink)**
