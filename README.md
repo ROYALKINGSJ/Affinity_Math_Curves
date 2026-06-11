@@ -30,25 +30,26 @@ The easiest way to use the generator is to download the ready-to-use application
 If you want to modify the code, add your own features, or compile the app yourself, you can build it directly using Python (v3.13+ recommended).
 
 **1. Clone the repository and navigate to the folder:**
-bash
+```bash
 git clone https://github.com/ROYALKINGSJ/Affinity_Math_Curves.git
 cd Affinity_Math_Curves
-
+```
 
 **2. Install the required dependencies:**
-bash
+```bash
 pip install customtkinter Pillow pyinstaller
-
+```
 
 **3. Compile the standalone application:**
 Run PyInstaller to package the script into a native OS application. Make sure to replace `"PATH"` with the actual absolute path to your script:
-bash
+```bash
 pyinstaller --noconfirm --onedir --windowed --noconsole "PATH/curve_generator.py"
+```
 
 *(Example for Mac):*
-bash
+```bash
 pyinstaller --noconfirm --onedir --windowed --noconsole /Users/macbook/Desktop/Affinity_Math_Curves/curve_generator.py
-
+```
 
 Once finished, your runnable application will be located inside the newly generated `dist` folder.
 
