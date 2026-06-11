@@ -2,23 +2,23 @@ import os
 import math
 import json
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 import urllib.request
 import webbrowser
 import customtkinter as ctk
+from PIL import Image, ImageDraw # New import for PNG/JPEG export
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
-CURRENT_VERSION = "v2.1.0"
+CURRENT_VERSION = "v2.3.0"
 GITHUB_REPO = "ROYALKINGSJ/Affinity_Math_Curves" 
 
 class CustomFunctionDialog(ctk.CTkToplevel):
-    # ... [Keep your existing CustomFunctionDialog code exactly as it was] ...
     def __init__(self, parent):
         super().__init__(parent)
         self.title("Custom Math Function")
-        self.geometry("400x300")
+        self.geometry("400x380")
         self.resizable(False, False)
         self.result = None
         
@@ -27,14 +27,22 @@ class CustomFunctionDialog(ctk.CTkToplevel):
 
         ctk.CTkLabel(self, text="Enter a mathematical equation using 'x'", font=ctk.CTkFont(weight="bold", size=14)).pack(pady=(20, 5))
         
-        examples = "Examples:\n- sin(x) + cos(2*x)\n- x**2 * 0.1\n- tan(x) * sin(x)"
+        examples = (
+            "Examples:\n"
+            "- x**2  (Parabola)\n"
+            "- x**3 - 5*x  (Cubic Curve)\n"
+            "- abs(x)  (V-Shape)\n"
+            "- sin(x)/x  (Sinc Wave)\n"
+            "- 2**x  (Exponential)\n"
+            "- sin(x) + cos(2*x)  (Complex Wave)"
+        )
         ctk.CTkLabel(self, text=examples, justify="left").pack(pady=5)
 
         link_label = ctk.CTkLabel(self, text="Test your function on Mathway first \u2197", text_color="#1f6aa5", cursor="hand2")
         link_label.pack(pady=5)
         link_label.bind("<Button-1>", lambda e: webbrowser.open("https://www.mathway.com/Graph"))
 
-        self.entry = ctk.CTkEntry(self, width=250, placeholder_text="e.g., sin(x) * 2")
+        self.entry = ctk.CTkEntry(self, width=250, placeholder_text="e.g., x**2")
         self.entry.pack(pady=15)
         self.entry.focus_set()
         self.entry.bind("<Return>", lambda e: self.submit())
@@ -58,26 +66,26 @@ class CurveGeneratorApp(ctk.CTk):
         
         # --- NATIVE MENU BAR SETUP ---
         self.menubar = tk.Menu(self)
-        
-        # Create a "Help" menu dropdown
         self.help_menu = tk.Menu(self.menubar, tearoff=0)
         self.help_menu.add_command(label="Check for Updates", command=lambda: self.check_github_updates(manual_check=True))
         self.help_menu.add_separator()
         self.help_menu.add_command(label="About", command=lambda: messagebox.showinfo("About", "Affinity Math Curve Generator\nCreated by ROYALKINGSJ"))
-        
-        # Add the dropdown to the main menu bar
         self.menubar.add_cascade(label="Help", menu=self.help_menu)
-        
-        # Apply the menu to the window
         self.config(menu=self.menubar)
-        # -----------------------------
-
-        # Run a silent update check on startup
+        
         self.check_github_updates(manual_check=False)
 
         # --- UI Layout ---
+        
+        # 0. Top Bar (GitHub Link)
+        top_bar = ctk.CTkFrame(self, fg_color="transparent")
+        top_bar.pack(fill="x", padx=15, pady=(10, 0))
+        github_link = ctk.CTkLabel(top_bar, text="★ GitHub Repository", text_color="#1f6aa5", cursor="hand2", font=ctk.CTkFont(size=12, weight="bold"))
+        github_link.pack(side="left")
+        github_link.bind("<Button-1>", lambda e: webbrowser.open(f"https://github.com/{GITHUB_REPO}"))
+
         title_label = ctk.CTkLabel(self, text="Live Math Curve Generator", font=ctk.CTkFont(size=20, weight="bold"))
-        title_label.pack(pady=(20, 15))
+        title_label.pack(pady=(5, 15))
 
         # 1. Function Selection
         func_frame = ctk.CTkFrame(self, fg_color="transparent")
@@ -127,7 +135,7 @@ class CurveGeneratorApp(ctk.CTk):
         self.freq_entry.pack(side="right")
         self.freq_entry.bind("<Return>", lambda e: self.redraw_preview())
 
-        # 3. Canvas Toggles (Axes & Grid)
+        # 3. Canvas Toggles
         toggle_frame = ctk.CTkFrame(self, fg_color="transparent")
         toggle_frame.pack(pady=5)
         self.show_grid_var = ctk.BooleanVar(value=True)
@@ -147,12 +155,12 @@ class CurveGeneratorApp(ctk.CTk):
         # 5. Export Section
         export_frame = ctk.CTkFrame(self, fg_color="transparent")
         export_frame.pack(pady=(15, 5))
-        ctk.CTkLabel(export_frame, text="Output File Name:").pack(side="left", padx=10)
+        ctk.CTkLabel(export_frame, text="Suggested File Name:").pack(side="left", padx=10)
         self.file_entry = ctk.CTkEntry(export_frame, width=150)
-        self.file_entry.insert(0, "math_curve.svg")
+        self.file_entry.insert(0, "math_curve") 
         self.file_entry.pack(side="left")
 
-        self.generate_btn = ctk.CTkButton(self, text="Export Vector to SVG", height=40, font=ctk.CTkFont(weight="bold"), command=self.generate_svg)
+        self.generate_btn = ctk.CTkButton(self, text="Export Curve Data", height=40, font=ctk.CTkFont(weight="bold"), command=self.export_curve)
         self.generate_btn.pack(pady=15)
 
         self.update_steps()
@@ -167,11 +175,7 @@ class CurveGeneratorApp(ctk.CTk):
                 latest_version = data.get("tag_name", CURRENT_VERSION)
                 
                 if latest_version != CURRENT_VERSION:
-                    # Ask user if they want to download the update
-                    answer = messagebox.askyesno(
-                        "Update Available!", 
-                        f"Version {latest_version} is available on GitHub!\nYou are running {CURRENT_VERSION}.\n\nWould you like to download the new version?"
-                    )
+                    answer = messagebox.askyesno("Update Available!", f"Version {latest_version} is available on GitHub!\nYou are running {CURRENT_VERSION}.\n\nWould you like to download the new version?")
                     if answer:
                         webbrowser.open(f"https://github.com/{GITHUB_REPO}/releases/latest")
                 elif manual_check:
@@ -265,7 +269,7 @@ class CurveGeneratorApp(ctk.CTk):
         if len(points) > 1:
             self.canvas.create_line(points, fill="#0052cc", width=2, smooth=True)
 
-    def generate_svg(self):
+    def export_curve(self):
         func = self.func_var.get()
         try:
             amp = round(float(self.amp_var.get()), 3)
@@ -274,38 +278,118 @@ class CurveGeneratorApp(ctk.CTk):
             messagebox.showerror("Input Error", "Check your amplitude and frequency values.")
             return
             
-        filename = self.file_entry.get()
+        suggested_name = self.file_entry.get()
+
+        # Added PNG and JPEG to the filetypes dropdown
+        filepath = filedialog.asksaveasfilename(
+            title="Export Curve Data",
+            initialfile=suggested_name,
+            defaultextension=".svg",
+            filetypes=[
+                ("SVG Vector File", "*.svg"),
+                ("PNG Image", "*.png"),
+                ("JPEG Image", "*.jpg"),
+                ("EPS PostScript", "*.eps"),
+                ("CSV Data Points", "*.csv"),
+                ("All files", "*.*")
+            ]
+        )
+
+        if not filepath:
+            return 
+
+        ext = os.path.splitext(filepath)[1].lower()
+        saved_name = os.path.basename(filepath)
+
         mid_x = self.canvas_width / 2
         mid_y = self.canvas_height / 2
-        svg_header = f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.canvas_width}" height="{self.canvas_height}">\n'
-        svg_footer = '</svg>'
-        
-        path_data = ""
-        started = False
-
-        for x in range(self.canvas_width):
-            real_x = x - mid_x
-            radians = (real_x / self.canvas_width) * 2 * math.pi * freq
-            y_offset = self.calculate_y(func, radians, amp)
-
-            if y_offset is None or abs(y_offset) > self.canvas_height * 2:
-                started = False
-                continue
-
-            actual_y = mid_y - y_offset
-
-            if not started:
-                path_data += f"M {x} {actual_y} "
-                started = True
-            else:
-                path_data += f"L {x} {actual_y} "
-
-        path_element = f'<path d="{path_data}" fill="none" stroke="black" stroke-width="2"/>\n'
 
         try:
-            with open(filename, 'w') as f:
-                f.write(svg_header + path_element + svg_footer)
-            messagebox.showinfo("Success", f"Saved successfully as '{filename}'!")
+            # --- HANDLE PNG & JPEG EXPORT ---
+            if ext in ['.png', '.jpg', '.jpeg']:
+                # Create a blank white image behind the scenes
+                img = Image.new("RGB", (self.canvas_width, self.canvas_height), "white")
+                draw = ImageDraw.Draw(img)
+                grid_spacing = 50
+
+                # Draw Background Grid & Axes exactly like the canvas
+                if self.show_grid_var.get():
+                    for i in range(0, self.canvas_width, grid_spacing):
+                        draw.line([(i, 0), (i, self.canvas_height)], fill="#e5e5e5", width=1)
+                    for i in range(0, self.canvas_height, grid_spacing):
+                        draw.line([(0, i), (self.canvas_width, i)], fill="#e5e5e5", width=1)
+                
+                if self.show_axes_var.get():
+                    draw.line([(0, mid_y), (self.canvas_width, mid_y)], fill="black", width=2)
+                    draw.line([(mid_x, 0), (mid_x, self.canvas_height)], fill="black", width=2)
+
+                # Draw the Math Curve
+                points = []
+                for x in range(self.canvas_width):
+                    real_x = x - mid_x
+                    radians = (real_x / self.canvas_width) * 2 * math.pi * freq
+                    y_offset = self.calculate_y(func, radians, amp)
+
+                    if y_offset is None or abs(y_offset) > self.canvas_height * 2:
+                        if len(points) > 1:
+                            draw.line(points, fill="#0052cc", width=2)
+                        points = []
+                        continue
+
+                    actual_y = mid_y - y_offset
+                    points.append((x, actual_y))
+
+                if len(points) > 1:
+                    draw.line(points, fill="#0052cc", width=2)
+
+                # Save the final compiled image
+                img.save(filepath)
+                messagebox.showinfo("Success", f"Saved image successfully as '{saved_name}'!")
+
+            # --- HANDLE EPS EXPORT ---
+            elif ext == '.eps':
+                self.canvas.postscript(file=filepath, colormode='color')
+                messagebox.showinfo("Success", f"Saved successfully as '{saved_name}'!")
+
+            # --- HANDLE CSV EXPORT ---
+            elif ext == '.csv':
+                with open(filepath, 'w') as f:
+                    f.write("X_Coordinate,Y_Coordinate\n")
+                    for x in range(self.canvas_width):
+                        real_x = x - mid_x
+                        radians = (real_x / self.canvas_width) * 2 * math.pi * freq
+                        y_offset = self.calculate_y(func, radians, amp)
+                        if y_offset is None or abs(y_offset) > self.canvas_height * 2: continue
+                        f.write(f"{real_x},{-y_offset}\n")
+                messagebox.showinfo("Success", f"Saved successfully as '{saved_name}'!")
+
+            # --- HANDLE SVG EXPORT (DEFAULT) ---
+            else:
+                svg_header = f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.canvas_width}" height="{self.canvas_height}">\n'
+                svg_footer = '</svg>'
+                path_data = ""
+                started = False
+
+                for x in range(self.canvas_width):
+                    real_x = x - mid_x
+                    radians = (real_x / self.canvas_width) * 2 * math.pi * freq
+                    y_offset = self.calculate_y(func, radians, amp)
+                    if y_offset is None or abs(y_offset) > self.canvas_height * 2:
+                        started = False
+                        continue
+                    actual_y = mid_y - y_offset
+                    if not started:
+                        path_data += f"M {x} {actual_y} "
+                        started = True
+                    else:
+                        path_data += f"L {x} {actual_y} "
+
+                path_element = f'<path d="{path_data}" fill="none" stroke="black" stroke-width="2"/>\n'
+
+                with open(filepath, 'w') as f:
+                    f.write(svg_header + path_element + svg_footer)
+                messagebox.showinfo("Success", f"Saved successfully as '{saved_name}'!")
+
         except Exception as e:
             messagebox.showerror("File Error", f"Could not save file: {e}")
 
