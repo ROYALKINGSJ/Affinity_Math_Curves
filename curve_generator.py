@@ -1,17 +1,19 @@
 import os
+import sys
 import math
 import json
+import threading
 import tkinter as tk
 from tkinter import messagebox, filedialog
 import urllib.request
 import webbrowser
 import customtkinter as ctk
-from PIL import Image, ImageDraw # New import for PNG/JPEG export
+from PIL import Image, ImageDraw
 
 ctk.set_appearance_mode("System")
 ctk.set_default_color_theme("blue")
 
-CURRENT_VERSION = "v2.3.0"
+CURRENT_VERSION = "v2.4.0"
 GITHUB_REPO = "ROYALKINGSJ/Affinity_Math_Curves" 
 
 class CustomFunctionDialog(ctk.CTkToplevel):
@@ -135,6 +137,16 @@ class CurveGeneratorApp(ctk.CTk):
         self.freq_entry.pack(side="right")
         self.freq_entry.bind("<Return>", lambda e: self.redraw_preview())
 
+        # Curve Length Multiplier
+        length_frame = ctk.CTkFrame(controls_frame, fg_color="transparent")
+        length_frame.pack(pady=(5, 15), fill="x", padx=15)
+        ctk.CTkLabel(length_frame, text="Export Length (Multiplier):").pack(side="left", padx=(0, 10))
+        self.length_var = ctk.IntVar(value=1)
+        self.length_slider = ctk.CTkSlider(length_frame, from_=1, to=10, number_of_steps=9, variable=self.length_var)
+        self.length_slider.pack(side="left", fill="x", expand=True, padx=10)
+        self.length_entry = ctk.CTkEntry(length_frame, textvariable=self.length_var, width=60)
+        self.length_entry.pack(side="right")
+
         # 3. Canvas Toggles
         toggle_frame = ctk.CTkFrame(self, fg_color="transparent")
         toggle_frame.pack(pady=5)
@@ -167,22 +179,51 @@ class CurveGeneratorApp(ctk.CTk):
         self.redraw_preview()
 
     def check_github_updates(self, manual_check=False):
-        url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+        def perform_check():
+            url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
+            try:
+                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=3) as response:
+                    data = json.loads(response.read().decode())
+                    latest_version = data.get("tag_name", CURRENT_VERSION)
+                    
+                    if latest_version != CURRENT_VERSION:
+                        answer = messagebox.askyesno(
+                            "Update Available!", 
+                            f"Version {latest_version} is available!\n\nWould you like to automatically download and install it now?"
+                        )
+                        if answer:
+                            self.apply_auto_update()
+                    elif manual_check:
+                        messagebox.showinfo("Up to Date", f"You are running the latest version ({CURRENT_VERSION}).")
+            except Exception as e:
+                if manual_check:
+                    messagebox.showerror("Network Error", "Could not connect to GitHub to check for updates.")
+        
+        # Running in a thread so the UI doesn't freeze while checking
+        threading.Thread(target=perform_check, daemon=True).start()
+
+    def apply_auto_update(self):
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=3) as response:
-                data = json.loads(response.read().decode())
-                latest_version = data.get("tag_name", CURRENT_VERSION)
-                
-                if latest_version != CURRENT_VERSION:
-                    answer = messagebox.askyesno("Update Available!", f"Version {latest_version} is available on GitHub!\nYou are running {CURRENT_VERSION}.\n\nWould you like to download the new version?")
-                    if answer:
-                        webbrowser.open(f"https://github.com/{GITHUB_REPO}/releases/latest")
-                elif manual_check:
-                    messagebox.showinfo("Up to Date", f"You are running the latest version ({CURRENT_VERSION}).")
-        except Exception:
-            if manual_check:
-                messagebox.showerror("Network Error", "Could not connect to GitHub to check for updates.")
+            # Fetch the raw code from your main branch
+            raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/curve_generator.py"
+            req = urllib.request.Request(raw_url, headers={'User-Agent': 'Mozilla/5.0'})
+            
+            with urllib.request.urlopen(req, timeout=10) as response:
+                new_code = response.read()
+            
+            # Overwrite this exact file with the new code
+            current_file = os.path.abspath(__file__)
+            with open(current_file, 'wb') as f:
+                f.write(new_code)
+            
+            messagebox.showinfo("Update Complete", "The app has been updated! It will now restart.")
+            
+            # Restart the Python script
+            os.execv(sys.executable, ['python'] + sys.argv)
+            
+        except Exception as e:
+            messagebox.showerror("Update Failed", f"Failed to auto-update: {e}\n\nPlease download manually from GitHub.")
 
     def update_steps(self, event=None):
         try:
@@ -274,13 +315,16 @@ class CurveGeneratorApp(ctk.CTk):
         try:
             amp = round(float(self.amp_var.get()), 3)
             freq = round(float(self.freq_var.get()), 3)
+            length_mult = int(self.length_var.get()) # Grab the multiplier
         except ValueError:
-            messagebox.showerror("Input Error", "Check your amplitude and frequency values.")
+            messagebox.showerror("Input Error", "Check your input values.")
             return
             
         suggested_name = self.file_entry.get()
+        
+        # Multiply the total width by the slider value
+        total_export_width = self.canvas_width * length_mult
 
-        # Added PNG and JPEG to the filetypes dropdown
         filepath = filedialog.asksaveasfilename(
             title="Export Curve Data",
             initialfile=suggested_name,
@@ -305,27 +349,24 @@ class CurveGeneratorApp(ctk.CTk):
         mid_y = self.canvas_height / 2
 
         try:
-            # --- HANDLE PNG & JPEG EXPORT ---
             if ext in ['.png', '.jpg', '.jpeg']:
-                # Create a blank white image behind the scenes
-                img = Image.new("RGB", (self.canvas_width, self.canvas_height), "white")
+                # Expand image width based on multiplier
+                img = Image.new("RGB", (total_export_width, self.canvas_height), "white")
                 draw = ImageDraw.Draw(img)
                 grid_spacing = 50
 
-                # Draw Background Grid & Axes exactly like the canvas
                 if self.show_grid_var.get():
-                    for i in range(0, self.canvas_width, grid_spacing):
+                    for i in range(0, total_export_width, grid_spacing):
                         draw.line([(i, 0), (i, self.canvas_height)], fill="#e5e5e5", width=1)
                     for i in range(0, self.canvas_height, grid_spacing):
-                        draw.line([(0, i), (self.canvas_width, i)], fill="#e5e5e5", width=1)
+                        draw.line([(0, i), (total_export_width, i)], fill="#e5e5e5", width=1)
                 
                 if self.show_axes_var.get():
-                    draw.line([(0, mid_y), (self.canvas_width, mid_y)], fill="black", width=2)
+                    draw.line([(0, mid_y), (total_export_width, mid_y)], fill="black", width=2)
                     draw.line([(mid_x, 0), (mid_x, self.canvas_height)], fill="black", width=2)
 
-                # Draw the Math Curve
                 points = []
-                for x in range(self.canvas_width):
+                for x in range(total_export_width):
                     real_x = x - mid_x
                     radians = (real_x / self.canvas_width) * 2 * math.pi * freq
                     y_offset = self.calculate_y(func, radians, amp)
@@ -342,20 +383,17 @@ class CurveGeneratorApp(ctk.CTk):
                 if len(points) > 1:
                     draw.line(points, fill="#0052cc", width=2)
 
-                # Save the final compiled image
                 img.save(filepath)
                 messagebox.showinfo("Success", f"Saved image successfully as '{saved_name}'!")
 
-            # --- HANDLE EPS EXPORT ---
             elif ext == '.eps':
                 self.canvas.postscript(file=filepath, colormode='color')
-                messagebox.showinfo("Success", f"Saved successfully as '{saved_name}'!")
+                messagebox.showinfo("Success", f"Saved EPS successfully. (Note: EPS exports at preview length only).")
 
-            # --- HANDLE CSV EXPORT ---
             elif ext == '.csv':
                 with open(filepath, 'w') as f:
                     f.write("X_Coordinate,Y_Coordinate\n")
-                    for x in range(self.canvas_width):
+                    for x in range(total_export_width):
                         real_x = x - mid_x
                         radians = (real_x / self.canvas_width) * 2 * math.pi * freq
                         y_offset = self.calculate_y(func, radians, amp)
@@ -363,20 +401,21 @@ class CurveGeneratorApp(ctk.CTk):
                         f.write(f"{real_x},{-y_offset}\n")
                 messagebox.showinfo("Success", f"Saved successfully as '{saved_name}'!")
 
-            # --- HANDLE SVG EXPORT (DEFAULT) ---
-            else:
-                svg_header = f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.canvas_width}" height="{self.canvas_height}">\n'
+            else: # SVG Default
+                svg_header = f'<svg xmlns="http://www.w3.org/2000/svg" width="{total_export_width}" height="{self.canvas_height}">\n'
                 svg_footer = '</svg>'
                 path_data = ""
                 started = False
 
-                for x in range(self.canvas_width):
+                for x in range(total_export_width):
                     real_x = x - mid_x
                     radians = (real_x / self.canvas_width) * 2 * math.pi * freq
                     y_offset = self.calculate_y(func, radians, amp)
+                    
                     if y_offset is None or abs(y_offset) > self.canvas_height * 2:
                         started = False
                         continue
+                        
                     actual_y = mid_y - y_offset
                     if not started:
                         path_data += f"M {x} {actual_y} "
